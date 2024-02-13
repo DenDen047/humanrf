@@ -43,7 +43,7 @@ Then, you can run a container.
 ```bash
 $ docker run -it --rm \
     --gpus device=1 \
-    -v /data/naoya/humanrf:/data \
+    -v /data/naoya/ActorsHQ:/data \
     denden047/humanrf /bin/bash
 ```
 

@@ -22,7 +22,8 @@ WORKDIR /
 RUN git clone --depth=1 --recursive https://github.com/synthesiaresearch/humanrf
 
 # Install GLM
-RUN apt install -y libglm-dev
+RUN apt-get install -y libglm-dev
+RUN apt-get install -y ffmpeg libsm6 libxext6
 
 # Install required packages and Tiny CUDA NN.
 WORKDIR /humanrf
