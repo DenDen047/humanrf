@@ -63,8 +63,8 @@ To get started quickly you can download a part of ActorsHQ and run HumanRF with 
 
 ./humanrf/run.py \
     --config example_humanrf \
-    --workspace /tmp/example_workspace \
-    --dataset.path /tmp/actorshq
+    --workspace /data/example_workspace \
+    --dataset.path /data/actorshq
 ```
 
 For that you will need an access file `actorshq_access_4x.yaml`, which you can request [here](https://www.actors-hq.com/), see section "Data access and download" for more details.

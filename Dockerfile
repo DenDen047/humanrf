@@ -1,43 +1,91 @@
-ARG PYTORCH="1.13.0"
-ARG CUDA="11.6"
-ARG CUDNN="8"
+FROM mambaorg/micromamba:1.4.4 as micromamba
+FROM nvidia/cuda:11.7.1-cudnn8-devel-ubuntu22.04 as builder
 
-FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-devel
+#           +----------------------------------------+
+#           |                                        |
+#           |           INSTALL MICROMAMBA           |
+#           |                                        |
+#           +----------------------------------------+
 
-ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"
-ENV TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
-ENV CMAKE_PREFIX_PATH="$(dirname $(which conda))/../"
+# https://github.com/mamba-org/micromamba-docker#adding-micromamba-to-an-existing-docker-image
+ENV MAMBA_USER=mamba
+ENV MAMBA_USER_ID=1000
+ENV MAMBA_USER_GID=1000
+ENV MAMBA_USER=$MAMBA_USER
+ENV MAMBA_ROOT_PREFIX="/opt/conda"
+ENV MAMBA_EXE="/bin/micromamba"
 
-# To fix GPG key error when running apt-get update
-# RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
-# RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/7fa2af80.pub
+COPY --from=micromamba "$MAMBA_EXE" "$MAMBA_EXE"
+COPY --from=micromamba /usr/local/bin/_activate_current_env.sh /usr/local/bin/_activate_current_env.sh
+COPY --from=micromamba /usr/local/bin/_dockerfile_shell.sh /usr/local/bin/_dockerfile_shell.sh
+COPY --from=micromamba /usr/local/bin/_entrypoint.sh /usr/local/bin/_entrypoint.sh
+COPY --from=micromamba /usr/local/bin/_activate_current_env.sh /usr/local/bin/_activate_current_env.sh
+COPY --from=micromamba /usr/local/bin/_dockerfile_initialize_user_accounts.sh /usr/local/bin/_dockerfile_initialize_user_accounts.sh
+COPY --from=micromamba /usr/local/bin/_dockerfile_setup_root_prefix.sh /usr/local/bin/_dockerfile_setup_root_prefix.sh
 
-RUN apt-get update && apt-get install -y git
-RUN pip install -U pip
+RUN /usr/local/bin/_dockerfile_initialize_user_accounts.sh && \
+    /usr/local/bin/_dockerfile_setup_root_prefix.sh
 
-RUN conda clean --all
+USER $MAMBA_USER
+SHELL ["/usr/local/bin/_dockerfile_shell.sh"]
+ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "/opt/nvidia/nvidia_entrypoint.sh"]
+ENV PATH=/opt/conda/bin:$PATH
 
-# Install HumanRF
+#           +----------------------------------------+
+#           |                                        |
+#           |            INSTALL PYTORCH             |
+#           |         and build dependencies         |
+#           |                                        |
+#           +----------------------------------------+
+
+ENV PYTHON_VERSION=3.10.6
+ENV PYTORCH_VERSION=1.13.1
+RUN micromamba install -y -n base -c conda-forge python=$PYTHON_VERSION git
+RUN micromamba install -y -n base -c pytorch -c nvidia -c conda-forge pytorch=$PYTORCH_VERSION pytorch-cuda=11.7
+
+#           +----------------------------------------+
+#           |                                        |
+#           |          INSTALL tiny-cuda-nn          |
+#           |                                        |
+#           +----------------------------------------+
+
+ENV TCNN_CUDA_ARCHITECTURES=75
+RUN pip install --verbose 'git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch'
+
+#           +----------------------------------------+
+#           |                                        |
+#           |          ISOLATE tiny-cuda-nn          |
+#           |                                        |
+#           +----------------------------------------+
+
+USER root
+RUN mkdir -v /dist
+RUN cp -rv /opt/conda/lib/python3.10/site-packages/tinycudann*/ /dist
+
+
+# HumanRF
 WORKDIR /
 RUN git clone --depth=1 --recursive https://github.com/synthesiaresearch/humanrf
 
 # Install GLM
-RUN apt-get install -y libglm-dev
-RUN apt-get install -y ffmpeg libsm6 libxext6
+RUN apt update
+RUN apt install -y libglm-dev
 
-# Install required packages and Tiny CUDA NN.
+# Install required packages
 WORKDIR /humanrf
 RUN pip install -r requirements.txt
-# RUN pip install git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
 
 # Install ActorsHQ package (dataset and data loader)
+RUN apt-get install -y ffmpeg libsm6 libxext6
 WORKDIR /humanrf/actorshq
-RUN pip3 install .
+ENV TORCH_CUDA_ARCH_LIST="7.5"
+RUN pip install .
 
-# # Install HumanRF package (method)
-# cd ../humanrf
-# pip3 install .
+# Install HumanRF package (method)
+WORKDIR /humanrf/humanrf
+RUN pip install .
 
-ENV PYTHONPATH=$PYTHONPATH:/path/to/repo
+# Add the installation folder to the PYTHONPATH
+ENV PYTHONPATH=$PYTHONPATH:/humanrf
 
 WORKDIR /humanrf
