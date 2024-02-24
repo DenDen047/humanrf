@@ -88,4 +88,13 @@ RUN pip install .
 # Add the installation folder to the PYTHONPATH
 ENV PYTHONPATH=$PYTHONPATH:/humanrf
 
+# VMAF
+RUN apt install -y nasm ninja-build doxygen xxd
+RUN pip install meson
+WORKDIR /
+RUN git clone https://github.com/Netflix/vmaf.git
+WORKDIR /vmaf/libvmaf
+RUN meson setup build --buildtype release -Denable_cuda=true
+RUN ninja -vC build install
+
 WORKDIR /humanrf

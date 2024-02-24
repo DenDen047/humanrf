@@ -29,9 +29,9 @@ config = [
     "--evaluation.camera_preset", "siggraph_test",
     "--evaluation.coverage", "siggraph_test",
 
-    "--dataset.actor", "Actor01",
-    "--dataset.sequence", "Sequence1",
-    "--dataset.scale", "4",
+    "--dataset.actor", "Actor06",
+    "--dataset.sequence", "Sequence2",
+    "--dataset.scale", "2",
     "--dataset.crop_center_square", "true",
     "--dataset.filter_light_bloom", "false",  # Set "true" to avoid light bleeding into the actor.
     "--dataset.frame_numbers", *[str(i) for i in range(*frame_configs)],
